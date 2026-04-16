@@ -282,7 +282,9 @@ label,
 }
 
 .filter-pills {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .filter-pill,
@@ -301,6 +303,9 @@ label,
   color: var(--ink-soft);
   border-radius: 999px;
   padding: 11px 14px;
+  min-width: 132px;
+  justify-content: center;
+  text-align: center;
   cursor: pointer;
   transition:
     transform 160ms ease,

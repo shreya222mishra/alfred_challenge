@@ -136,7 +136,6 @@ const form = document.querySelector("#scenario-form");
 const scenarioList = document.querySelector("#scenario-list");
 const filterPills = document.querySelector("#filter-pills");
 const searchInput = document.querySelector("#scenario-search");
-const runSelectedButton = document.querySelector("#run-selected");
 const runCustomButton = document.querySelector("#run-custom");
 const resetFormButton = document.querySelector("#reset-form");
 const traceTabs = document.querySelector("#trace-tabs");
@@ -193,13 +192,6 @@ resultsContent.hidden = true;
 pipelineContent.hidden = true;
 traceContentPanel.hidden = true;
 
-runSelectedButton.addEventListener("click", () => {
-  prepareRunUI();
-  window.requestAnimationFrame(() => {
-    runScenario(getScenarioById(selectedScenarioId));
-  });
-});
-
 runCustomButton.addEventListener("click", () => {
   prepareRunUI();
   window.requestAnimationFrame(() => {
@@ -209,6 +201,7 @@ runCustomButton.addEventListener("click", () => {
 
 resetFormButton.addEventListener("click", () => {
   hydrateForm(getScenarioById(selectedScenarioId));
+  resetDecisionUI();
 });
 
 filterPills.addEventListener("click", (event) => {
@@ -722,13 +715,15 @@ function renderScenarioList() {
   }
 
   for (const scenario of visibleScenarios) {
+    const previewSignals = computeSignals(normalizeScenario(scenario));
+    const previewRiskLevel = deriveRiskLevel(previewSignals.riskScore);
     const card = document.createElement("button");
     card.type = "button";
     card.className = `scenario-card${scenario.id === selectedScenarioId ? " active" : ""}`;
     card.innerHTML = `
       <div class="scenario-card-header">
         <strong>${scenario.name}</strong>
-        <span class="tag ${toneForRisk(scenario.riskLevel)}">${scenario.riskLevel}</span>
+        <span class="tag ${toneForRisk(previewRiskLevel)}">${previewRiskLevel}</span>
       </div>
       <p class="panel-copy">${scenario.proposedAction}</p>
       <div class="scenario-meta">
@@ -941,6 +936,13 @@ function toneForRisk(riskLevel) {
   return "warn";
 }
 
+function deriveRiskLevel(riskScore) {
+  if (riskScore >= 80) return "critical";
+  if (riskScore >= 55) return "high";
+  if (riskScore >= 25) return "medium";
+  return "low";
+}
+
 function toneForDifficulty(difficulty) {
   if (difficulty === "easy") return "success";
   if (difficulty === "risky") return "danger";
@@ -953,9 +955,7 @@ function getScenarioById(id) {
 
 function setRunning(value) {
   running = value;
-  runSelectedButton.disabled = value;
   runCustomButton.disabled = value;
-  runSelectedButton.textContent = value ? "Evaluating..." : "Run Selected";
   runCustomButton.textContent = value ? "Running..." : "Run Decision Layer";
 }
 
@@ -988,6 +988,58 @@ function toggleResultsSection(forceExpanded) {
   if (icon) {
     icon.textContent = forceExpanded ? "−" : "+";
   }
+}
+
+function resetDecisionUI() {
+  latestTrace = buildEmptyTrace();
+  activeTrace = "inputs";
+  renderTrace(latestTrace);
+  renderSignalBadges([]);
+  renderDecisionGraphs(
+    {
+      riskScore: 0,
+      silentExecutionThreshold: 24,
+      notifyThreshold: 42,
+      confirmThreshold: 69,
+    },
+    {
+      confidence: 0,
+      finalLabel: "Awaiting run",
+      decision: "",
+      pipelineStatus: "Idle",
+      rationale: "Select a preloaded scenario or edit the form and run the pipeline.",
+      follow_up: "None yet.",
+    },
+  );
+  renderSummary(
+    {
+      finalLabel: "Awaiting run",
+      decision: "",
+      confidence: 0,
+      pipelineStatus: "Idle",
+      rationale: "Select a preloaded scenario or edit the form and run the pipeline.",
+      follow_up: "None yet.",
+    },
+    {
+      riskScore: 0,
+    },
+  );
+  updatePipelineView("idle");
+  toggleResultsSection(false);
+  toggleExpandableSection(
+    pipelineToggleButton,
+    pipelineContent,
+    "Show pipeline",
+    "Hide pipeline",
+    false,
+  );
+  toggleExpandableSection(
+    traceToggleButton,
+    traceContentPanel,
+    "Show artifacts",
+    "Hide artifacts",
+    false,
+  );
 }
 
 function toggleExpandableSection(button, content, closedLabel, openLabel, forceExpanded = null) {
