@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>alfred_ Execution Decision Layer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">alfred_ challenge prototype</p>
+          <h1>Execution Decision Layer</h1>
+          <p class="lede">
+            A small decision system that blends deterministic risk signals with
+            an LLM-style judgment step to choose whether alfred_ should act,
+            confirm, clarify, or refuse.
+          </p>
+        </div>
+        <div class="hero-card">
+          <p class="hero-label">Decision set</p>
+          <ul>
+            <li>Execute silently</li>
+            <li>Execute and tell the user after</li>
+            <li>Confirm before executing</li>
+            <li>Ask a clarifying question</li>
+            <li>Refuse / escalate</li>
+          </ul>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="panel scenario-panel">
+          <div class="panel-header">
+            <h2>Scenarios</h2>
+            <button id="run-selected" class="button primary">Run Selected</button>
+          </div>
+          <p class="panel-copy">
+            Includes easy, ambiguous, risky, and failure-mode cases.
+          </p>
+          <div id="scenario-list" class="scenario-list"></div>
+        </aside>
+
+        <section class="panel workspace-panel">
+          <div class="panel-header">
+            <h2>Scenario Input</h2>
+            <button id="reset-form" class="button subtle">Reset</button>
+          </div>
+
+          <form id="scenario-form" class="form-grid">
+            <label>
+              <span>Scenario name</span>
+              <input id="scenario-name" name="scenarioName" type="text" />
+            </label>
+
+            <label>
+              <span>Action type</span>
+              <input id="action-type" name="actionType" type="text" />
+            </label>
+
+            <label>
+              <span>User tier</span>
+              <select id="user-tier" name="userTier">
+                <option value="trusted">Trusted</option>
+                <option value="new">New</option>
+                <option value="watchlist">Watchlist</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Latest user message</span>
+              <textarea id="latest-message" name="latestMessage" rows="3"></textarea>
+            </label>
+
+            <label>
+              <span>Proposed action</span>
+              <textarea id="proposed-action" name="proposedAction" rows="4"></textarea>
+            </label>
+
+            <label>
+              <span>Conversation history</span>
+              <textarea id="conversation-history" name="conversationHistory" rows="8"></textarea>
+            </label>
+
+            <label>
+              <span>Known user state</span>
+              <textarea id="user-state" name="userState" rows="5"></textarea>
+            </label>
+
+            <label>
+              <span>Failure simulation</span>
+              <select id="failure-mode" name="failureMode">
+                <option value="none">None</option>
+                <option value="timeout">LLM timeout</option>
+                <option value="malformed">Malformed model output</option>
+                <option value="missing_context">Missing critical context</option>
+              </select>
+            </label>
+          </form>
+
+          <div class="action-bar">
+            <button id="run-custom" class="button primary">Run Decision Layer</button>
+          </div>
+        </section>
+      </main>
+
+      <section class="results-grid">
+        <article class="panel summary-panel">
+          <div class="panel-header">
+            <h2>Decision</h2>
+            <div id="decision-pill" class="decision-pill">Awaiting run</div>
+          </div>
+          <p id="decision-rationale" class="decision-rationale">
+            Select a preloaded scenario or edit the form and run the pipeline.
+          </p>
+          <div class="summary-stats">
+            <div>
+              <span class="stat-label">Risk score</span>
+              <strong id="risk-score">-</strong>
+            </div>
+            <div>
+              <span class="stat-label">Confidence</span>
+              <strong id="confidence-score">-</strong>
+            </div>
+            <div>
+              <span class="stat-label">Status</span>
+              <strong id="pipeline-status">Idle</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel trace-panel">
+          <div class="panel-header">
+            <h2>Under The Hood</h2>
+          </div>
+          <div class="trace-grid">
+            <section>
+              <h3>Inputs</h3>
+              <pre id="trace-inputs"></pre>
+            </section>
+            <section>
+              <h3>Computed Signals</h3>
+              <pre id="trace-signals"></pre>
+            </section>
+            <section>
+              <h3>Prompt</h3>
+              <pre id="trace-prompt"></pre>
+            </section>
+            <section>
+              <h3>Raw Model Output</h3>
+              <pre id="trace-raw-output"></pre>
+            </section>
+            <section>
+              <h3>Parsed Decision</h3>
+              <pre id="trace-parsed"></pre>
+            </section>
+          </div>
+        </article>
+      </section>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
