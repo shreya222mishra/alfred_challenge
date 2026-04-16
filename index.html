@@ -9,155 +9,385 @@
   <body>
     <div class="shell">
       <header class="hero">
-        <div>
+        <div class="hero-copy">
           <p class="eyebrow">alfred_ challenge prototype</p>
-          <h1>Execution Decision Layer</h1>
+          <h1>Safer autonomous actions.</h1>
           <p class="lede">
-            A small decision system that blends deterministic risk signals with
-            an LLM-style judgment step to choose whether alfred_ should act,
-            confirm, clarify, or refuse.
+            Explore how the execution decision layer weighs risk, context, and
+            ambiguity before alfred_ acts, confirms, clarifies, or refuses.
           </p>
+          <div class="hero-stats">
+            <div class="hero-stat">
+              <span>Scenarios</span>
+              <strong>6 preloaded</strong>
+            </div>
+            <div class="hero-stat">
+              <span>Failure paths</span>
+              <strong>Visible in UI</strong>
+            </div>
+            <div class="hero-stat">
+              <span>Decision modes</span>
+              <strong>5 outcomes</strong>
+            </div>
+          </div>
         </div>
-        <div class="hero-card">
+
+        <aside class="hero-card">
           <p class="hero-label">Decision set</p>
-          <ul>
+          <ul class="decision-list">
             <li>Execute silently</li>
             <li>Execute and tell the user after</li>
             <li>Confirm before executing</li>
             <li>Ask a clarifying question</li>
             <li>Refuse / escalate</li>
           </ul>
-        </div>
+          <div class="hero-note">
+            The model is intentionally bounded. Deterministic rules still
+            enforce safe overrides when context is suspicious or incomplete.
+          </div>
+        </aside>
       </header>
 
-      <main class="layout">
-        <aside class="panel scenario-panel">
+      <main class="main-grid">
+        <aside class="panel sidebar-panel">
           <div class="panel-header">
-            <h2>Scenarios</h2>
+            <div>
+              <p class="section-kicker">Scenario browser</p>
+              <h2>Pick a situation to evaluate</h2>
+            </div>
             <button id="run-selected" class="button primary">Run Selected</button>
           </div>
-          <p class="panel-copy">
-            Includes easy, ambiguous, risky, and failure-mode cases.
-          </p>
+
+          <div class="filter-bar">
+            <div id="filter-pills" class="filter-pills">
+              <button class="filter-pill active" data-filter="all" type="button">
+                All
+              </button>
+              <button class="filter-pill" data-filter="easy" type="button">
+                Easy
+              </button>
+              <button class="filter-pill" data-filter="ambiguous" type="button">
+                Ambiguous
+              </button>
+              <button class="filter-pill" data-filter="risky" type="button">
+                Risky
+              </button>
+              <button class="filter-pill" data-filter="failure" type="button">
+                Failure modes
+              </button>
+            </div>
+            <label class="search-wrap">
+              <span class="sr-only">Search scenarios</span>
+              <input
+                id="scenario-search"
+                type="search"
+                placeholder="Search scenarios or actions"
+              />
+            </label>
+          </div>
+
+          <div class="scenario-summary">
+            <p class="section-kicker">Selected scenario</p>
+            <strong id="selected-scenario-name">Create a reminder for a dentist appointment</strong>
+            <p id="selected-scenario-summary" class="panel-copy">
+              Create one reminder for tomorrow at 3:00 PM saying "Call my dentist."
+            </p>
+          </div>
+
           <div id="scenario-list" class="scenario-list"></div>
         </aside>
 
-        <section class="panel workspace-panel">
-          <div class="panel-header">
-            <h2>Scenario Input</h2>
-            <button id="reset-form" class="button subtle">Reset</button>
-          </div>
+        <section class="workspace">
+          <article class="panel editor-panel">
+            <div class="panel-header">
+              <div>
+                <p class="section-kicker">Context editor</p>
+                <h2>Adjust the decision inputs</h2>
+              </div>
+              <button id="reset-form" class="button subtle">Reset</button>
+            </div>
 
-          <form id="scenario-form" class="form-grid">
-            <label>
-              <span>Scenario name</span>
-              <input id="scenario-name" name="scenarioName" type="text" />
-            </label>
+            <form id="scenario-form" class="form-grid">
+              <label>
+                <span>Scenario name</span>
+                <input id="scenario-name" name="scenarioName" type="text" />
+              </label>
 
-            <label>
-              <span>Action type</span>
-              <input id="action-type" name="actionType" type="text" />
-            </label>
+              <label>
+                <span>Action type</span>
+                <input id="action-type" name="actionType" type="text" />
+              </label>
 
-            <label>
-              <span>User tier</span>
-              <select id="user-tier" name="userTier">
-                <option value="trusted">Trusted</option>
-                <option value="new">New</option>
-                <option value="watchlist">Watchlist</option>
-              </select>
-            </label>
+              <label>
+                <span>User tier</span>
+                <select id="user-tier" name="userTier">
+                  <option value="trusted">Trusted</option>
+                  <option value="new">New</option>
+                  <option value="watchlist">Watchlist</option>
+                </select>
+              </label>
 
-            <label>
-              <span>Latest user message</span>
-              <textarea id="latest-message" name="latestMessage" rows="3"></textarea>
-            </label>
+              <label>
+                <span>Failure simulation</span>
+                <select id="failure-mode" name="failureMode">
+                  <option value="none">None</option>
+                  <option value="timeout">LLM timeout</option>
+                  <option value="malformed">Malformed model output</option>
+                  <option value="missing_context">Missing critical context</option>
+                </select>
+              </label>
 
-            <label>
-              <span>Proposed action</span>
-              <textarea id="proposed-action" name="proposedAction" rows="4"></textarea>
-            </label>
+              <label class="full-span">
+                <span>Latest user message</span>
+                <textarea id="latest-message" name="latestMessage" rows="3"></textarea>
+              </label>
 
-            <label>
-              <span>Conversation history</span>
-              <textarea id="conversation-history" name="conversationHistory" rows="8"></textarea>
-            </label>
+              <label class="full-span">
+                <span>Proposed action</span>
+                <textarea id="proposed-action" name="proposedAction" rows="4"></textarea>
+              </label>
 
-            <label>
-              <span>Known user state</span>
-              <textarea id="user-state" name="userState" rows="5"></textarea>
-            </label>
+              <label class="full-span">
+                <span>Conversation history</span>
+                <textarea
+                  id="conversation-history"
+                  name="conversationHistory"
+                  rows="7"
+                ></textarea>
+              </label>
 
-            <label>
-              <span>Failure simulation</span>
-              <select id="failure-mode" name="failureMode">
-                <option value="none">None</option>
-                <option value="timeout">LLM timeout</option>
-                <option value="malformed">Malformed model output</option>
-                <option value="missing_context">Missing critical context</option>
-              </select>
-            </label>
-          </form>
+              <label class="full-span">
+                <span>Known user state</span>
+                <textarea id="user-state" name="userState" rows="4"></textarea>
+              </label>
+            </form>
 
-          <div class="action-bar">
-            <button id="run-custom" class="button primary">Run Decision Layer</button>
-          </div>
+            <div class="editor-footer">
+              <p class="panel-copy">
+                Tip: try modifying the same scenario with and without prior
+                context to see how much the final decision changes.
+              </p>
+              <button id="run-custom" class="button primary">
+                Run Decision Layer
+              </button>
+            </div>
+          </article>
+
+          <section class="results-grid">
+            <article class="panel summary-panel">
+              <button
+                id="results-toggle"
+                class="results-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="results-content"
+              >
+                <div>
+                  <p class="section-kicker">Decision outcome</p>
+                  <h2 id="decision-title">Awaiting run</h2>
+                  <p id="decision-subnote" class="decision-subnote">
+                    Idle: run the decision layer to see results.
+                  </p>
+                </div>
+                <div class="results-toggle-side">
+                  <div id="decision-pill" class="decision-pill">Idle</div>
+                  <span id="results-toggle-icon" class="results-toggle-icon">+</span>
+                </div>
+              </button>
+
+              <div id="results-content" class="expandable-content" hidden>
+                <p id="decision-rationale" class="decision-rationale">
+                  Select a preloaded scenario or edit the form and run the
+                  pipeline.
+                </p>
+
+                <div class="followup-card">
+                  <span class="followup-label">Suggested user-facing follow-up</span>
+                  <p id="decision-followup">None yet.</p>
+                </div>
+
+                <div class="risk-meter">
+                  <div class="risk-meter-labels">
+                    <span>Risk score</span>
+                    <strong id="risk-score">-</strong>
+                  </div>
+                  <div class="risk-track">
+                    <div id="risk-fill" class="risk-fill"></div>
+                  </div>
+                </div>
+
+                <div class="summary-stats">
+                  <div>
+                    <span class="stat-label">Confidence</span>
+                    <strong id="confidence-score">-</strong>
+                  </div>
+                  <div>
+                    <span class="stat-label">Pipeline status</span>
+                    <strong id="pipeline-status">Idle</strong>
+                  </div>
+                  <div>
+                    <span class="stat-label">Selected mode</span>
+                    <strong id="decision-mode">-</strong>
+                  </div>
+                </div>
+
+                <div class="decision-graphs">
+                  <div class="panel-inline-header">
+                    <h3>Decision analytics</h3>
+                    <span class="panel-copy">Interactive graphs for score, confidence, and signal impact</span>
+                  </div>
+
+                  <div class="graph-grid">
+                    <article class="graph-card">
+                      <span class="graph-label">Confidence dial</span>
+                      <div id="confidence-dial" class="confidence-dial">
+                        <div class="confidence-dial-inner">
+                          <strong id="confidence-dial-value">0%</strong>
+                          <span>model confidence</span>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="graph-card">
+                      <span class="graph-label">Risk threshold map</span>
+                      <div class="threshold-meta">
+                        <strong id="threshold-current-label">Current risk: 0</strong>
+                        <span>Silent, notify, and confirm zones</span>
+                      </div>
+                      <div class="threshold-chart">
+                        <div class="threshold-band safe">Silent</div>
+                        <div class="threshold-band notify">Notify</div>
+                        <div class="threshold-band confirm">Confirm</div>
+                        <div class="threshold-band refuse">Refuse</div>
+                        <div id="threshold-marker" class="threshold-marker"></div>
+                      </div>
+                      <div class="threshold-legend">
+                        <span id="threshold-silent">Silent ≤ 24</span>
+                        <span id="threshold-notify">Notify ≤ 42</span>
+                        <span id="threshold-confirm">Confirm ≤ 69</span>
+                      </div>
+                    </article>
+
+                    <article class="graph-card graph-card-wide">
+                      <div class="graph-card-head">
+                        <span class="graph-label">Signal impact chart</span>
+                        <span id="signal-impact-detail" class="panel-copy">
+                          Hover or click a bar to inspect why it influenced the decision.
+                        </span>
+                      </div>
+                      <div id="signal-impact-chart" class="signal-impact-chart"></div>
+                    </article>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="panel-inline-header">
+                    <h3>Why this happened</h3>
+                    <span class="panel-copy">Computed signals driving the verdict</span>
+                  </div>
+                  <div id="signal-badges" class="signal-badges"></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel systems-panel">
+              <div class="panel-header panel-header-stack">
+                <div>
+                  <p class="section-kicker">Pipeline + under the hood</p>
+                  <h2>Explore the decision process and inspect every artifact in one place</h2>
+                </div>
+              </div>
+
+              <div class="panel-controls">
+                <button
+                  id="pipeline-toggle"
+                  class="panel-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="pipeline-content"
+                >
+                  <span>Show pipeline</span>
+                  <span class="panel-toggle-icon">+</span>
+                </button>
+                <button
+                  id="trace-toggle"
+                  class="panel-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="trace-content-panel"
+                >
+                  <span>Show artifacts</span>
+                  <span class="panel-toggle-icon">+</span>
+                </button>
+                <button id="copy-trace" class="button subtle">Copy Current Panel</button>
+              </div>
+
+              <div id="pipeline-content" class="expandable-content" hidden>
+                <div id="pipeline-steps" class="pipeline-steps">
+                  <div class="pipeline-step">
+                    <span class="pipeline-index">1</span>
+                    <div>
+                      <strong>Normalize inputs</strong>
+                      <p>Bring the scenario into a structured form.</p>
+                    </div>
+                  </div>
+                  <div class="pipeline-step">
+                    <span class="pipeline-index">2</span>
+                    <div>
+                      <strong>Compute signals</strong>
+                      <p>Extract ambiguity, risk, and policy clues in code.</p>
+                    </div>
+                  </div>
+                  <div class="pipeline-step">
+                    <span class="pipeline-index">3</span>
+                    <div>
+                      <strong>Judge with the model layer</strong>
+                      <p>Choose one bounded decision and rationale.</p>
+                    </div>
+                  </div>
+                  <div class="pipeline-step">
+                    <span class="pipeline-index">4</span>
+                    <div>
+                      <strong>Validate and finalize</strong>
+                      <p>Apply safe fallbacks or hard overrides when needed.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="trace-content-panel" class="expandable-content" hidden>
+                <div id="trace-tabs" class="trace-tabs">
+                  <button class="trace-tab active" data-trace="inputs" type="button">
+                    Inputs
+                  </button>
+                  <button class="trace-tab" data-trace="signals" type="button">
+                    Signals
+                  </button>
+                  <button class="trace-tab" data-trace="prompt" type="button">
+                    Prompt
+                  </button>
+                  <button class="trace-tab" data-trace="raw" type="button">
+                    Raw output
+                  </button>
+                  <button class="trace-tab" data-trace="parsed" type="button">
+                    Parsed
+                  </button>
+                </div>
+
+                <div class="trace-panel-shell">
+                  <div class="trace-meta">
+                    <strong id="trace-title">Inputs</strong>
+                    <span id="trace-caption" class="panel-copy">
+                      The structured request and user state being evaluated.
+                    </span>
+                  </div>
+                  <pre id="trace-content"></pre>
+                </div>
+              </div>
+            </article>
+          </section>
         </section>
       </main>
-
-      <section class="results-grid">
-        <article class="panel summary-panel">
-          <div class="panel-header">
-            <h2>Decision</h2>
-            <div id="decision-pill" class="decision-pill">Awaiting run</div>
-          </div>
-          <p id="decision-rationale" class="decision-rationale">
-            Select a preloaded scenario or edit the form and run the pipeline.
-          </p>
-          <div class="summary-stats">
-            <div>
-              <span class="stat-label">Risk score</span>
-              <strong id="risk-score">-</strong>
-            </div>
-            <div>
-              <span class="stat-label">Confidence</span>
-              <strong id="confidence-score">-</strong>
-            </div>
-            <div>
-              <span class="stat-label">Status</span>
-              <strong id="pipeline-status">Idle</strong>
-            </div>
-          </div>
-        </article>
-
-        <article class="panel trace-panel">
-          <div class="panel-header">
-            <h2>Under The Hood</h2>
-          </div>
-          <div class="trace-grid">
-            <section>
-              <h3>Inputs</h3>
-              <pre id="trace-inputs"></pre>
-            </section>
-            <section>
-              <h3>Computed Signals</h3>
-              <pre id="trace-signals"></pre>
-            </section>
-            <section>
-              <h3>Prompt</h3>
-              <pre id="trace-prompt"></pre>
-            </section>
-            <section>
-              <h3>Raw Model Output</h3>
-              <pre id="trace-raw-output"></pre>
-            </section>
-            <section>
-              <h3>Parsed Decision</h3>
-              <pre id="trace-parsed"></pre>
-            </section>
-          </div>
-        </article>
-      </section>
     </div>
 
     <script type="module" src="./app.js"></script>

@@ -6,6 +6,29 @@ const DECISIONS = {
   refuse_or_escalate: "Refuse / escalate",
 };
 
+const TRACE_META = {
+  inputs: {
+    title: "Inputs",
+    caption: "The structured request and user state being evaluated.",
+  },
+  signals: {
+    title: "Computed signals",
+    caption: "Risk, ambiguity, and policy clues extracted deterministically.",
+  },
+  prompt: {
+    title: "Prompt",
+    caption: "The exact bounded instruction sent to the model layer.",
+  },
+  raw: {
+    title: "Raw model output",
+    caption: "The response before parsing, validation, or fallback logic.",
+  },
+  parsed: {
+    title: "Parsed decision",
+    caption: "The final normalized verdict after validation and overrides.",
+  },
+};
+
 const SCENARIOS = [
   {
     id: "easy-reminder",
@@ -30,7 +53,8 @@ const SCENARIOS = [
     riskLevel: "medium",
     actionType: "reschedule_calendar",
     userTier: "trusted",
-    latestMessage: "Please move my 1:1 with Maya from 2 to 2:30 and let me know once it's done.",
+    latestMessage:
+      "Please move my 1:1 with Maya from 2 to 2:30 and let me know once it's done.",
     proposedAction:
       "Reschedule the internal 1:1 with Maya from 2:00 PM to 2:30 PM today, then send a confirmation message.",
     conversationHistory:
@@ -78,7 +102,8 @@ const SCENARIOS = [
     riskLevel: "critical",
     actionType: "initiate_wire_transfer",
     userTier: "watchlist",
-    latestMessage: "Wire $48,000 to the new vendor today. Don't bug me with confirmations.",
+    latestMessage:
+      "Wire $48,000 to the new vendor today. Don't bug me with confirmations.",
     proposedAction:
       "Initiate a same-day $48,000 wire transfer to a newly added vendor bank account.",
     conversationHistory:
@@ -105,40 +130,125 @@ const SCENARIOS = [
   },
 ];
 
+const TRACE_ORDER = ["inputs", "signals", "prompt", "raw", "parsed"];
+
 const form = document.querySelector("#scenario-form");
 const scenarioList = document.querySelector("#scenario-list");
+const filterPills = document.querySelector("#filter-pills");
+const searchInput = document.querySelector("#scenario-search");
 const runSelectedButton = document.querySelector("#run-selected");
 const runCustomButton = document.querySelector("#run-custom");
 const resetFormButton = document.querySelector("#reset-form");
+const traceTabs = document.querySelector("#trace-tabs");
+const copyTraceButton = document.querySelector("#copy-trace");
+const pipelineToggleButton = document.querySelector("#pipeline-toggle");
+const traceToggleButton = document.querySelector("#trace-toggle");
+const pipelineContent = document.querySelector("#pipeline-content");
+const traceContentPanel = document.querySelector("#trace-content-panel");
+const resultsToggleButton = document.querySelector("#results-toggle");
+const resultsContent = document.querySelector("#results-content");
 
 const outputNodes = {
+  selectedName: document.querySelector("#selected-scenario-name"),
+  selectedSummary: document.querySelector("#selected-scenario-summary"),
+  title: document.querySelector("#decision-title"),
+  subnote: document.querySelector("#decision-subnote"),
+  mode: document.querySelector("#decision-mode"),
   pill: document.querySelector("#decision-pill"),
   rationale: document.querySelector("#decision-rationale"),
+  followup: document.querySelector("#decision-followup"),
   risk: document.querySelector("#risk-score"),
+  riskFill: document.querySelector("#risk-fill"),
   confidence: document.querySelector("#confidence-score"),
   status: document.querySelector("#pipeline-status"),
-  inputs: document.querySelector("#trace-inputs"),
-  signals: document.querySelector("#trace-signals"),
-  prompt: document.querySelector("#trace-prompt"),
-  raw: document.querySelector("#trace-raw-output"),
-  parsed: document.querySelector("#trace-parsed"),
+  signalBadges: document.querySelector("#signal-badges"),
+  confidenceDial: document.querySelector("#confidence-dial"),
+  confidenceDialValue: document.querySelector("#confidence-dial-value"),
+  thresholdCurrentLabel: document.querySelector("#threshold-current-label"),
+  thresholdMarker: document.querySelector("#threshold-marker"),
+  thresholdSilent: document.querySelector("#threshold-silent"),
+  thresholdNotify: document.querySelector("#threshold-notify"),
+  thresholdConfirm: document.querySelector("#threshold-confirm"),
+  signalImpactChart: document.querySelector("#signal-impact-chart"),
+  signalImpactDetail: document.querySelector("#signal-impact-detail"),
+  pipeline: document.querySelector("#pipeline-steps"),
+  traceTitle: document.querySelector("#trace-title"),
+  traceCaption: document.querySelector("#trace-caption"),
+  traceContent: document.querySelector("#trace-content"),
 };
 
 let selectedScenarioId = SCENARIOS[0].id;
+let activeFilter = "all";
+let activeTrace = "inputs";
+let latestTrace = buildEmptyTrace();
+let running = false;
 
 renderScenarioList();
 hydrateForm(getScenarioById(selectedScenarioId));
+updateSelectedScenarioSummary(getScenarioById(selectedScenarioId));
+renderTrace(latestTrace);
+renderSignalBadges([]);
+updatePipelineView("idle");
+resultsContent.hidden = true;
+pipelineContent.hidden = true;
+traceContentPanel.hidden = true;
 
 runSelectedButton.addEventListener("click", () => {
-  runScenario(getScenarioById(selectedScenarioId));
+  prepareRunUI();
+  window.requestAnimationFrame(() => {
+    runScenario(getScenarioById(selectedScenarioId));
+  });
 });
 
 runCustomButton.addEventListener("click", () => {
-  runScenario(readFormScenario());
+  prepareRunUI();
+  window.requestAnimationFrame(() => {
+    runScenario(readFormScenario());
+  });
 });
 
 resetFormButton.addEventListener("click", () => {
   hydrateForm(getScenarioById(selectedScenarioId));
+});
+
+filterPills.addEventListener("click", (event) => {
+  const pill = event.target.closest("[data-filter]");
+  if (!pill) return;
+  activeFilter = pill.dataset.filter;
+  renderScenarioList();
+});
+
+searchInput.addEventListener("input", () => {
+  renderScenarioList();
+});
+
+traceTabs.addEventListener("click", (event) => {
+  const tab = event.target.closest("[data-trace]");
+  if (!tab) return;
+  activeTrace = tab.dataset.trace;
+  renderTrace(latestTrace);
+});
+
+copyTraceButton.addEventListener("click", async () => {
+  const traceText = latestTrace[activeTrace];
+  if (!navigator.clipboard || !traceText) return;
+  await navigator.clipboard.writeText(traceText);
+  copyTraceButton.textContent = "Copied";
+  window.setTimeout(() => {
+    copyTraceButton.textContent = "Copy Current Panel";
+  }, 1200);
+});
+
+pipelineToggleButton.addEventListener("click", () => {
+  toggleExpandableSection(pipelineToggleButton, pipelineContent, "Show pipeline", "Hide pipeline");
+});
+
+traceToggleButton.addEventListener("click", () => {
+  toggleExpandableSection(traceToggleButton, traceContentPanel, "Show artifacts", "Hide artifacts");
+});
+
+resultsToggleButton.addEventListener("click", () => {
+  toggleResultsSection(resultsToggleButton.getAttribute("aria-expanded") !== "true");
 });
 
 async function runScenario(scenario) {
@@ -146,13 +256,48 @@ async function runScenario(scenario) {
   const signals = computeSignals(inputs);
   const prompt = buildPrompt(inputs, signals);
 
-  setStatus("Running");
-  renderTrace({
-    inputs,
-    signals,
+  setRunning(true);
+  updatePipelineView("running");
+  renderSignalBadges(buildSignalCards(signals));
+  latestTrace = {
+    inputs: JSON.stringify(inputs, null, 2),
+    signals: JSON.stringify(signals, null, 2),
     prompt,
-    rawOutput: "Waiting for model...",
-    parsedDecision: "Waiting for parser...",
+    raw: "Waiting for model...",
+    parsed: "Waiting for parser and finalizer...",
+  };
+  renderTrace(latestTrace);
+  renderSummary({
+    finalLabel: "Evaluating...",
+    decision: "",
+    confidence: 0,
+    rationale:
+      "The pipeline is computing risk signals and preparing a bounded decision for the model layer.",
+    follow_up: "No user-facing follow-up yet.",
+    pipelineStatus: "Running",
+  }, signals);
+  if (pipelineContent.hidden) {
+    toggleExpandableSection(
+      pipelineToggleButton,
+      pipelineContent,
+      "Show pipeline",
+      "Hide pipeline",
+      true,
+    );
+  }
+  if (traceContentPanel.hidden) {
+    toggleExpandableSection(
+      traceToggleButton,
+      traceContentPanel,
+      "Show artifacts",
+      "Hide artifacts",
+      true,
+    );
+  }
+  renderDecisionGraphs(signals, {
+    confidence: 0,
+    finalLabel: "Evaluating...",
+    decision: "",
   });
 
   let rawOutput = "";
@@ -167,14 +312,19 @@ async function runScenario(scenario) {
   }
 
   const finalDecision = finalizeDecision(parsedDecision, inputs, signals);
-  renderTrace({
-    inputs,
-    signals,
+  latestTrace = {
+    inputs: JSON.stringify(inputs, null, 2),
+    signals: JSON.stringify(signals, null, 2),
     prompt,
-    rawOutput,
-    parsedDecision: finalDecision,
-  });
+    raw: typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput, null, 2),
+    parsed: JSON.stringify(finalDecision, null, 2),
+  };
+  renderTrace(latestTrace);
   renderSummary(finalDecision, signals);
+  renderDecisionGraphs(signals, finalDecision);
+  renderSignalBadges(buildSignalCards(signals, finalDecision));
+  updatePipelineView(finalDecision.usedSafeFallback ? "fallback" : "complete");
+  setRunning(false);
 }
 
 function normalizeScenario(input) {
@@ -244,15 +394,42 @@ function computeSignals(inputs) {
 }
 
 function buildPrompt(inputs, signals) {
-  return `System:\nYou are alfred_'s execution decision model. Choose exactly one decision key from:\n- execute_silently\n- execute_then_notify\n- confirm_before_executing\n- ask_clarifying_question\n- refuse_or_escalate\n\nPolicy:\n- Ask a clarifying question when intent, entity, or key parameters are unresolved.\n- Confirm before executing when intent is resolved but risk is above the silent execution threshold.\n- Refuse or escalate when policy disallows the action, or risk/uncertainty remains too high.\n- Prefer safe behavior when model confidence is weak.\n\nReturn strict JSON with keys:\n{\n  "decision": "<decision_key>",\n  "confidence": <0 to 1>,\n  "rationale": "<one short paragraph>",\n  "follow_up": "<optional user-facing sentence>"\n}\n\nInputs:\n${JSON.stringify(inputs, null, 2)}\n\nDeterministic signals:\n${JSON.stringify(signals, null, 2)}\n\nThink about conversation history, not only the latest message.`;
+  return `System:
+You are alfred_'s execution decision model. Choose exactly one decision key from:
+- execute_silently
+- execute_then_notify
+- confirm_before_executing
+- ask_clarifying_question
+- refuse_or_escalate
+
+Policy:
+- Ask a clarifying question when intent, entity, or key parameters are unresolved.
+- Confirm before executing when intent is resolved but risk is above the silent execution threshold.
+- Refuse or escalate when policy disallows the action, or risk/uncertainty remains too high.
+- Prefer safe behavior when model confidence is weak.
+
+Return strict JSON with keys:
+{
+  "decision": "<decision_key>",
+  "confidence": <0 to 1>,
+  "rationale": "<one short paragraph>",
+  "follow_up": "<optional user-facing sentence>"
+}
+
+Inputs:
+${JSON.stringify(inputs, null, 2)}
+
+Deterministic signals:
+${JSON.stringify(signals, null, 2)}
+
+Think about conversation history, not only the latest message.`;
 }
 
 async function simulateModel(prompt, inputs, signals) {
-  await delay(450);
+  await delay(220);
 
   if (inputs.failureMode === "timeout") {
-    const error = new Error("LLM timed out before returning a decision.");
-    throw error;
+    throw new Error("LLM timed out before returning a decision.");
   }
 
   if (inputs.failureMode === "malformed") {
@@ -376,45 +553,194 @@ function finalizeDecision(parsedDecision, inputs, signals) {
 }
 
 function renderSummary(finalDecision, signals) {
-  outputNodes.pill.className = `decision-pill ${finalDecision.decision}`;
-  outputNodes.pill.textContent = finalDecision.finalLabel;
+  outputNodes.title.textContent = finalDecision.finalLabel;
+  outputNodes.subnote.textContent =
+    finalDecision.pipelineStatus === "Idle"
+      ? "Idle: run the decision layer to see results."
+      : `Status: ${finalDecision.pipelineStatus}.`;
+  outputNodes.mode.textContent = finalDecision.finalLabel;
+  outputNodes.pill.className = `decision-pill ${finalDecision.decision || ""}`;
+  outputNodes.pill.textContent = finalDecision.pipelineStatus || "Idle";
   outputNodes.rationale.textContent = finalDecision.rationale;
+  outputNodes.followup.textContent = finalDecision.follow_up || "No additional follow-up needed.";
   outputNodes.risk.textContent = `${signals.riskScore}/100`;
+  outputNodes.riskFill.style.width = `${signals.riskScore}%`;
   outputNodes.confidence.textContent = `${Math.round((finalDecision.confidence || 0) * 100)}%`;
-  setStatus(finalDecision.pipelineStatus);
+  outputNodes.status.textContent = finalDecision.pipelineStatus;
 }
 
-function renderTrace({ inputs, signals, prompt, rawOutput, parsedDecision }) {
-  outputNodes.inputs.textContent = JSON.stringify(inputs, null, 2);
-  outputNodes.signals.textContent = JSON.stringify(signals, null, 2);
-  outputNodes.prompt.textContent = prompt;
-  outputNodes.raw.textContent =
-    typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput, null, 2);
-  outputNodes.parsed.textContent = JSON.stringify(parsedDecision, null, 2);
+function renderSignalBadges(cards) {
+  outputNodes.signalBadges.innerHTML = "";
+  if (!cards.length) {
+    outputNodes.signalBadges.innerHTML =
+      '<div class="empty-state">Run a scenario to see which signals affected the final decision.</div>';
+    return;
+  }
+
+  for (const card of cards) {
+    const node = document.createElement("article");
+    node.className = "signal-badge";
+    node.innerHTML = `<strong>${card.title}</strong><span>${card.body}</span>`;
+    outputNodes.signalBadges.appendChild(node);
+  }
 }
 
-function setStatus(label) {
-  outputNodes.status.textContent = label;
+function renderDecisionGraphs(signals, finalDecision) {
+  const confidencePct = Math.round((finalDecision.confidence || 0) * 100);
+  outputNodes.confidenceDial.style.setProperty("--dial-value", `${confidencePct * 3.6}deg`);
+  outputNodes.confidenceDialValue.textContent = `${confidencePct}%`;
+
+  outputNodes.thresholdCurrentLabel.textContent = `Current risk: ${signals.riskScore}/100`;
+  outputNodes.thresholdSilent.textContent = `Silent <= ${signals.silentExecutionThreshold}`;
+  outputNodes.thresholdNotify.textContent = `Notify <= ${signals.notifyThreshold}`;
+  outputNodes.thresholdConfirm.textContent = `Confirm <= ${signals.confirmThreshold}`;
+  outputNodes.thresholdMarker.style.left = `${signals.riskScore}%`;
+
+  const contributions = buildSignalContributions(signals, finalDecision);
+  renderSignalImpactChart(contributions, finalDecision);
+}
+
+function renderSignalImpactChart(contributions, finalDecision) {
+  outputNodes.signalImpactChart.innerHTML = "";
+
+  if (!contributions.length) {
+    outputNodes.signalImpactChart.innerHTML =
+      '<div class="empty-state">Run a scenario to see which signals pushed the decision.</div>';
+    outputNodes.signalImpactDetail.textContent =
+      "Hover or click a bar to inspect why it influenced the decision.";
+    return;
+  }
+
+  const maxValue = Math.max(...contributions.map((item) => item.value), 1);
+
+  contributions.forEach((item, index) => {
+    const row = document.createElement("div");
+    row.className = "impact-row";
+    row.innerHTML = `
+      <span class="impact-label">${item.label}</span>
+      <div class="impact-bar-wrap">
+        <div
+          class="impact-bar ${item.tone}"
+          style="width:${Math.max((item.value / maxValue) * 100, 6)}%"
+          role="button"
+          tabindex="0"
+          aria-label="${item.label}: ${item.value} points"
+        ></div>
+      </div>
+      <span class="impact-score">${item.value}</span>
+    `;
+
+    const bar = row.querySelector(".impact-bar");
+    const setActive = () => {
+      outputNodes.signalImpactChart
+        .querySelectorAll(".impact-bar")
+        .forEach((node) => node.classList.remove("active"));
+      bar.classList.add("active");
+      outputNodes.signalImpactDetail.textContent = `${item.label}: ${item.description}`;
+    };
+
+    bar.addEventListener("mouseenter", setActive);
+    bar.addEventListener("focus", setActive);
+    bar.addEventListener("click", setActive);
+    bar.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        setActive();
+      }
+    });
+
+    outputNodes.signalImpactChart.appendChild(row);
+
+    if (index === 0) {
+      setActive();
+    }
+  });
+}
+
+function renderTrace(trace) {
+  latestTrace = trace;
+
+  for (const tab of traceTabs.querySelectorAll(".trace-tab")) {
+    tab.classList.toggle("active", tab.dataset.trace === activeTrace);
+  }
+
+  const meta = TRACE_META[activeTrace];
+  outputNodes.traceTitle.textContent = meta.title;
+  outputNodes.traceCaption.textContent = meta.caption;
+  outputNodes.traceContent.textContent = trace[activeTrace];
+}
+
+function updatePipelineView(state) {
+  const steps = [...outputNodes.pipeline.querySelectorAll(".pipeline-step")];
+
+  steps.forEach((step, index) => {
+    step.classList.remove("active", "complete", "fallback");
+    if (state === "idle") return;
+    if (state === "running" && index <= 2) {
+      step.classList.add(index === 2 ? "active" : "complete");
+    }
+    if (state === "complete") {
+      step.classList.add("complete");
+    }
+    if (state === "fallback") {
+      if (index < 3) step.classList.add("complete");
+      if (index === 3) step.classList.add("fallback", "active");
+    }
+  });
 }
 
 function renderScenarioList() {
   scenarioList.innerHTML = "";
-  for (const scenario of SCENARIOS) {
+
+  for (const pill of filterPills.querySelectorAll(".filter-pill")) {
+    pill.classList.toggle("active", pill.dataset.filter === activeFilter);
+  }
+
+  const searchTerm = searchInput.value.trim().toLowerCase();
+  const visibleScenarios = SCENARIOS.filter((scenario) => {
+    const matchesFilter =
+      activeFilter === "all" ||
+      scenario.difficulty === activeFilter ||
+      (activeFilter === "failure" && scenario.failureMode !== "none");
+
+    const haystack = [
+      scenario.name,
+      scenario.proposedAction,
+      scenario.latestMessage,
+      scenario.actionType,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return matchesFilter && (!searchTerm || haystack.includes(searchTerm));
+  });
+
+  if (!visibleScenarios.length) {
+    scenarioList.innerHTML =
+      '<div class="empty-state">No scenarios match that filter. Try another category or search term.</div>';
+    return;
+  }
+
+  for (const scenario of visibleScenarios) {
     const card = document.createElement("button");
     card.type = "button";
     card.className = `scenario-card${scenario.id === selectedScenarioId ? " active" : ""}`;
     card.innerHTML = `
-      <strong>${scenario.name}</strong>
+      <div class="scenario-card-header">
+        <strong>${scenario.name}</strong>
+        <span class="tag ${toneForRisk(scenario.riskLevel)}">${scenario.riskLevel}</span>
+      </div>
       <p class="panel-copy">${scenario.proposedAction}</p>
       <div class="scenario-meta">
-        <span class="tag">${scenario.difficulty}</span>
-        <span class="tag ${scenario.riskLevel === "critical" || scenario.riskLevel === "high" ? "risky" : ""}">${scenario.riskLevel}</span>
-        ${scenario.failureMode !== "none" ? `<span class="tag failure">${scenario.failureMode}</span>` : ""}
+        <span class="tag ${toneForDifficulty(scenario.difficulty)}">${scenario.difficulty}</span>
+        <span class="tag">${scenario.actionType}</span>
+        ${scenario.failureMode !== "none" ? `<span class="tag warn">${scenario.failureMode}</span>` : ""}
       </div>
     `;
     card.addEventListener("click", () => {
       selectedScenarioId = scenario.id;
       hydrateForm(scenario);
+      updateSelectedScenarioSummary(scenario);
       renderScenarioList();
     });
     scenarioList.appendChild(card);
@@ -430,6 +756,11 @@ function hydrateForm(scenario) {
   form.elements.conversationHistory.value = scenario.conversationHistory;
   form.elements.userState.value = scenario.userState;
   form.elements.failureMode.value = scenario.failureMode;
+}
+
+function updateSelectedScenarioSummary(scenario) {
+  outputNodes.selectedName.textContent = scenario.name;
+  outputNodes.selectedSummary.textContent = scenario.proposedAction;
 }
 
 function readFormScenario() {
@@ -448,8 +779,224 @@ function readFormScenario() {
   };
 }
 
+function buildSignalCards(signals, finalDecision = null) {
+  const cards = [];
+
+  if (signals.riskScore < signals.silentExecutionThreshold) {
+    cards.push({
+      title: "Below silent execution threshold",
+      body: "The deterministic risk score is low enough that alfred_ can usually act without extra friction.",
+    });
+  }
+  if (signals.userRequestedNotification) {
+    cards.push({
+      title: "User requested visibility",
+      body: "The language explicitly asks to be told after execution, which nudges the system toward a notify-after path.",
+    });
+  }
+  if (signals.unresolvedIntent || signals.missingCriticalContext) {
+    cards.push({
+      title: "Critical context is missing",
+      body: "Intent or key parameters are not fully grounded, so clarification is safer than guessing.",
+    });
+  }
+  if (signals.hasExplicitHold) {
+    cards.push({
+      title: "Conflicting history detected",
+      body: "Prior conversation includes a hold or wait instruction, so the latest message should not be treated in isolation.",
+    });
+  }
+  if (signals.externalParty) {
+    cards.push({
+      title: "External stakeholders are involved",
+      body: "Actions touching partners, vendors, or board members deserve more scrutiny than internal admin tasks.",
+    });
+  }
+  if (signals.financialRisk || signals.suspiciousContext) {
+    cards.push({
+      title: "High-risk policy signal",
+      body: "Financial actions or suspicious account context trigger the strongest guardrails and may override the model.",
+    });
+  }
+  if (finalDecision?.usedSafeFallback) {
+    cards.push({
+      title: "Safe fallback was used",
+      body: "The system recovered conservatively from a timeout or malformed response instead of risking irreversible execution.",
+    });
+  }
+
+  return cards.slice(0, 6);
+}
+
+function buildSignalContributions(signals, finalDecision) {
+  const items = [];
+
+  if (signals.externalParty) {
+    items.push({
+      label: "External party",
+      value: 20,
+      tone: "warn",
+      description:
+        "External recipients or stakeholders raise the scrutiny level because errors are more visible and harder to reverse.",
+    });
+  }
+  if (signals.financialRisk) {
+    items.push({
+      label: "Financial risk",
+      value: 25,
+      tone: "danger",
+      description:
+        "Pricing, payment, or transfer language materially increases the chance of irreversible harm.",
+    });
+  }
+  if (signals.highImpactAction) {
+    items.push({
+      label: "High-impact action",
+      value: 12,
+      tone: "warn",
+      description:
+        "Actions like send, cancel, or wire can change outside systems and deserve more care than a low-stakes reminder.",
+    });
+  }
+  if (signals.hasExplicitHold) {
+    items.push({
+      label: "Conflicting history",
+      value: 22,
+      tone: "danger",
+      description:
+        "A previous hold or wait instruction means the latest user message should not be interpreted in isolation.",
+    });
+  }
+  if (signals.suspiciousContext) {
+    items.push({
+      label: "Suspicious context",
+      value: 30,
+      tone: "danger",
+      description:
+        "Risk systems or anomalous context can override the model entirely and force a refusal or escalation path.",
+    });
+  }
+  if (signals.unresolvedIntent) {
+    items.push({
+      label: "Unresolved intent",
+      value: 18,
+      tone: "warn",
+      description:
+        "References like 'that' or 'it' create ambiguity around what should actually happen next.",
+    });
+  }
+  if (signals.missingCriticalContext) {
+    items.push({
+      label: "Missing context",
+      value: 28,
+      tone: "danger",
+      description:
+        "Key parameters are absent, so the system should clarify instead of guessing.",
+    });
+  }
+  if (signals.userRequestedNotification) {
+    items.push({
+      label: "Requested visibility",
+      value: 10,
+      tone: "safe",
+      description:
+        "The user explicitly asked to be told afterward, which nudges the experience toward a notify-after execution path.",
+    });
+  }
+  if (!items.length) {
+    items.push({
+      label: "Low-risk baseline",
+      value: 8,
+      tone: "safe",
+      description:
+        "No strong risk flags were detected, so the baseline score stays low and silent execution remains viable.",
+    });
+  }
+  if (finalDecision.usedSafeFallback) {
+    items.unshift({
+      label: "Safe fallback",
+      value: 16,
+      tone: "warn",
+      description:
+        "The system used a conservative fallback because the model timed out or returned malformed output.",
+    });
+  }
+
+  return items.sort((a, b) => b.value - a.value).slice(0, 6);
+}
+
+function buildEmptyTrace() {
+  return {
+    inputs: "Run a scenario to inspect the normalized input payload.",
+    signals: "Run a scenario to inspect the computed deterministic signals.",
+    prompt: "Run a scenario to inspect the exact prompt passed to the model layer.",
+    raw: "Run a scenario to inspect the raw output before parsing.",
+    parsed: "Run a scenario to inspect the final parsed decision object.",
+  };
+}
+
+function toneForRisk(riskLevel) {
+  if (riskLevel === "low") return "success";
+  if (riskLevel === "high" || riskLevel === "critical") return "danger";
+  return "warn";
+}
+
+function toneForDifficulty(difficulty) {
+  if (difficulty === "easy") return "success";
+  if (difficulty === "risky") return "danger";
+  return "warn";
+}
+
 function getScenarioById(id) {
   return SCENARIOS.find((scenario) => scenario.id === id) || SCENARIOS[0];
+}
+
+function setRunning(value) {
+  running = value;
+  runSelectedButton.disabled = value;
+  runCustomButton.disabled = value;
+  runSelectedButton.textContent = value ? "Evaluating..." : "Run Selected";
+  runCustomButton.textContent = value ? "Running..." : "Run Decision Layer";
+}
+
+function prepareRunUI() {
+  toggleResultsSection(true);
+  if (pipelineContent.hidden) {
+    toggleExpandableSection(
+      pipelineToggleButton,
+      pipelineContent,
+      "Show pipeline",
+      "Hide pipeline",
+      true,
+    );
+  }
+  if (traceContentPanel.hidden) {
+    toggleExpandableSection(
+      traceToggleButton,
+      traceContentPanel,
+      "Show artifacts",
+      "Hide artifacts",
+      true,
+    );
+  }
+}
+
+function toggleResultsSection(forceExpanded) {
+  resultsToggleButton.setAttribute("aria-expanded", String(forceExpanded));
+  resultsContent.hidden = !forceExpanded;
+  const icon = document.querySelector("#results-toggle-icon");
+  if (icon) {
+    icon.textContent = forceExpanded ? "−" : "+";
+  }
+}
+
+function toggleExpandableSection(button, content, closedLabel, openLabel, forceExpanded = null) {
+  const nextExpanded =
+    forceExpanded ?? (button.getAttribute("aria-expanded") !== "true");
+  button.setAttribute("aria-expanded", String(nextExpanded));
+  button.querySelector("span").textContent = nextExpanded ? openLabel : closedLabel;
+  button.querySelector(".panel-toggle-icon").textContent = nextExpanded ? "−" : "+";
+  content.hidden = !nextExpanded;
 }
 
 function delay(ms) {
